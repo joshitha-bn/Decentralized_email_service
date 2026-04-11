@@ -1,11 +1,12 @@
 {
   "name": "securemail-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "SecureMail GunDB Relay Server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

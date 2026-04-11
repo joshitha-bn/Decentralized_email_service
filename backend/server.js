@@ -1,70 +1,71 @@
-const express = require("express")
-const cors = require("cors")
-const http = require("http")
-const Gun = require("gun")
+import express from "express"
+import http from "http"
+import Gun from "gun"
+import os from "os"
 
 const app = express()
-
-/* CORS for Next.js frontend */
-
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
-    credentials: true,
-  })
-)
-
-/* Gun static files */
-
-app.use(Gun.serve)
-
-/* Status page */
-
-app.get("/", (req, res) => {
-  res.send(`
-    <html>
-      <body style="background:#0a0a0a; color:#d4a017; font-family:monospace; padding:40px;">
-        <h1>🔫 SecureMail GunDB Relay</h1>
-        <p style="color:#f5f0e8">Status: <span style="color:#4caf6e">● Running</span></p>
-        <p style="color:#f5f0e8">Peer URL: <code style="color:#f9e07a">http://localhost:8765/gun</code></p>
-      </body>
-    </html>
-  `)
-})
-
-/* Create HTTP server */
-
 const server = http.createServer(app)
-
-/* Initialize Gun */
-
-const gun = Gun({
-  web: server,
-  file: "data",      // local persistence
-  radisk: true,
-})
-
-/* Optional logging */
-
-gun.on("hi", peer => {
-  console.log("🌐 Peer connected:", peer.url || "unknown")
-})
-
-gun.on("bye", peer => {
-  console.log("❌ Peer disconnected:", peer.url || "unknown")
-})
-
-/* Start server */
-
 const PORT = 8765
 
-server.listen(PORT, () => {
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-  console.log("🔫  SecureMail GunDB Relay Server")
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-  console.log(`✅  Running at http://localhost:${PORT}`)
-  console.log(`🔗  Gun peer: http://localhost:${PORT}/gun`)
-  console.log(`💾  Data persisted to ./data/`)
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+// ── CORS — allow all origins for local network access ──
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*")
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+  if (req.method === "OPTIONS") return res.sendStatus(200)
+  next()
+})
+
+app.use(express.json())
+
+// ── Health check — confirm server is running ──
+app.get("/", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "SecureMail GunDB Relay",
+    port: PORT,
+    time: new Date().toISOString(),
+  })
+})
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", gun: "running", port: PORT })
+})
+
+// ── Mount Gun on the HTTP server ──
+const gun = Gun({
+  web: server,       // attach to existing HTTP server
+  file: "data",       // persist data to ./data folder
+  radisk: true,
+  multicast: false,        // disable multicast — use explicit peers
+})
+
+// ── Gun debug logging ──
+gun.on("out", { "#": { "*": "" } })
+
+// ── Log all local network IPs so you know which IP to use ──
+const getLocalIPs = () => {
+  const interfaces = os.networkInterfaces()
+  const ips = []
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        ips.push(iface.address)
+      }
+    }
+  }
+  return ips
+}
+
+server.listen(PORT, "0.0.0.0", () => {
+  const ips = getLocalIPs()
+  console.log("\n🚀 SecureMail GunDB Relay Server")
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  console.log(`✅ Listening on port ${PORT}`)
+  console.log(`✅ Local:   http://localhost:${PORT}/gun`)
+  ips.forEach((ip) => {
+    console.log(`✅ Network: http://${ip}:${PORT}/gun`)
+  })
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  console.log("📌 Use the Network URL for cross-device access\n")
 })
